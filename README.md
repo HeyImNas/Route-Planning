@@ -26,7 +26,7 @@ This project implements and compares different search algorithms (BFS, DFS, Gree
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/route-planning.git
+   git clone https://github.com/heyimnas/route-planning
    cd route-planning
    ```
 
