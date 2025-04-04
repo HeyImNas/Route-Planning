@@ -107,8 +107,8 @@ class MainWindow(QMainWindow):
         # Set up the UI
         self.setup_ui()
         
-        # Create a default graph for demonstration
-        self.create_default_graph()
+        # Initialize empty graph visualization
+        self.visualize_graph()
     
     def create_toolbar(self):
         """Create toolbar with actions like theme toggle"""
@@ -408,6 +408,52 @@ class MainWindow(QMainWindow):
         grid_graph_options.setLayout(grid_layout)
         graph_options_layout.addWidget(grid_graph_options)
         
+        # Custom graph options
+        custom_graph_options = QGroupBox("Custom Graph Options")
+        custom_layout = QGridLayout()
+        
+        custom_layout.addWidget(QLabel("Node Position X:"), 0, 0)
+        self.node_x_spin = QDoubleSpinBox()
+        self.node_x_spin.setRange(0, 100)
+        self.node_x_spin.setValue(0)
+        self.node_x_spin.setSingleStep(1.0)
+        custom_layout.addWidget(self.node_x_spin, 0, 1)
+        
+        custom_layout.addWidget(QLabel("Node Position Y:"), 1, 0)
+        self.node_y_spin = QDoubleSpinBox()
+        self.node_y_spin.setRange(0, 100)
+        self.node_y_spin.setValue(0)
+        self.node_y_spin.setSingleStep(1.0)
+        custom_layout.addWidget(self.node_y_spin, 1, 1)
+        
+        # Node removal
+        custom_layout.addWidget(QLabel("Select Node:"), 2, 0)
+        self.remove_node_combo = QComboBox()
+        custom_layout.addWidget(self.remove_node_combo, 2, 1)
+        
+        # Button layout
+        button_layout = QGridLayout()
+        
+        # Add node button
+        self.add_node_btn = QPushButton("Add Node")
+        self.add_node_btn.clicked.connect(self.add_custom_node)
+        button_layout.addWidget(self.add_node_btn, 0, 0)
+        
+        # Remove node button
+        self.remove_node_btn = QPushButton("Remove Node")
+        self.remove_node_btn.clicked.connect(self.remove_custom_node)
+        button_layout.addWidget(self.remove_node_btn, 0, 1)
+        
+        # Clear custom graph button
+        self.clear_custom_graph_btn = QPushButton("Clear Custom Graph")
+        self.clear_custom_graph_btn.clicked.connect(self.clear_custom_graph)
+        button_layout.addWidget(self.clear_custom_graph_btn, 1, 0, 1, 2)
+        
+        custom_layout.addLayout(button_layout, 3, 0, 1, 2)
+        
+        custom_graph_options.setLayout(custom_layout)
+        graph_options_layout.addWidget(custom_graph_options)
+        
         # Graph generation button
         self.generate_graph_btn = QPushButton("Generate Graph")
         self.generate_graph_btn.clicked.connect(self.generate_graph)
@@ -453,9 +499,12 @@ class MainWindow(QMainWindow):
         self.update_edge_btn.clicked.connect(self.update_edge_cost)
         self.get_edge_btn = QPushButton("Get Current Cost")
         self.get_edge_btn.clicked.connect(self.get_edge_cost)
+        self.randomize_costs_btn = QPushButton("Randomize All Costs")
+        self.randomize_costs_btn.clicked.connect(self.randomize_edge_costs)
         
         edge_buttons_layout.addWidget(self.update_edge_btn)
         edge_buttons_layout.addWidget(self.get_edge_btn)
+        edge_buttons_layout.addWidget(self.randomize_costs_btn)
         edge_editor_layout.addLayout(edge_buttons_layout, 3, 0, 1, 2)
         
         edge_editor_group.setLayout(edge_editor_layout)
@@ -553,10 +602,14 @@ class MainWindow(QMainWindow):
         perf_widget = QWidget()
         perf_layout = QVBoxLayout(perf_widget)
         
-        self.perf_figure, self.perf_axes = plt.subplots(2, 2, figsize=(6, 6))
+        # Create performance figure with increased height and adjusted spacing
+        self.perf_figure, self.perf_axes = plt.subplots(2, 2, figsize=(8, 10))
         self.perf_canvas = MatplotlibCanvas(self.perf_figure)
         self.perf_toolbar = NavigationToolbar(self.perf_canvas, self)
         self.perf_toolbar.setStyleSheet("background-color: #f0f0f0;")  # Default light style
+        
+        # Add spacing between subplots
+        self.perf_figure.subplots_adjust(hspace=0.4, wspace=0.3)
         
         perf_layout.addWidget(self.perf_toolbar)
         perf_layout.addWidget(self.perf_canvas)
@@ -601,48 +654,107 @@ class MainWindow(QMainWindow):
         self.update_graph_options()
     
     def update_graph_options(self):
-        """Update which graph options are enabled based on selection"""
+        """Update which graph options are visible based on selection"""
         is_random = self.random_graph_radio.isChecked()
         is_grid = self.grid_graph_radio.isChecked()
         is_custom = self.custom_graph_radio.isChecked()
         
-        # Enable/disable appropriate option groups
+        # Show/hide appropriate option groups
         for widget in self.findChildren(QGroupBox):
             if widget.title() == "Random Graph Options":
-                widget.setEnabled(is_random)
+                widget.setVisible(is_random)
             elif widget.title() == "Grid Graph Options":
-                widget.setEnabled(is_grid)
+                widget.setVisible(is_grid)
+            elif widget.title() == "Custom Graph Options":
+                widget.setVisible(is_custom)
+            elif widget.title() in ["Start and Goal Nodes", "Edge Cost Editor", "Graph Type"]:
+                # These groups should always be visible
+                widget.setVisible(True)
+        
+        # Show/hide generate button based on graph type
+        self.generate_graph_btn.setVisible(not is_custom)
     
-    def generate_graph(self):
-        """Generate a graph based on the selected options"""
-        # Clear existing graph
-        self.graph = MapGraph()
+    def add_custom_node(self):
+        """Add a node to the custom graph at the specified coordinates"""
+        if not self.custom_graph_radio.isChecked():
+            return
+            
+        # Create a new graph if it doesn't exist
+        if not hasattr(self, 'graph') or self.graph is None:
+            self.graph = MapGraph()
+            
+            # Update algorithms with new graph
+            for algo in self.algorithms.values():
+                algo.graph = self.graph
+            
+            self.search_visualizer = SearchVisualizer(self.graph, self.algorithms)
         
-        # Generate based on selection
-        if self.random_graph_radio.isChecked():
-            num_nodes = self.node_count_spin.value()
-            connectivity = self.connectivity_spin.value() / 100.0
-            self.graph.generate_random_graph(num_nodes, connectivity)
-            self.status_message(f"Generated random graph with {num_nodes} nodes and {connectivity:.2f} connectivity")
+        # Get coordinates
+        x = self.node_x_spin.value()
+        y = self.node_y_spin.value()
         
-        elif self.grid_graph_radio.isChecked():
-            width = self.grid_width_spin.value()
-            height = self.grid_height_spin.value()
-            diagonals = self.diagonal_edges_check.isChecked()
-            self.graph.generate_grid_graph(width, height, diagonals)
-            self.status_message(f"Generated grid graph of size {width}x{height}" + (" with diagonal edges" if diagonals else ""))
+        # Generate node label (A, B, C, ... AA, AB, etc.)
+        num_nodes = len(self.graph.nodes)
+        if num_nodes < 26:
+            # Single letter (A-Z)
+            node_id = chr(65 + num_nodes)  # 65 is ASCII for 'A'
+        else:
+            # Double letters (AA, AB, etc.)
+            first = chr(65 + ((num_nodes - 26) // 26))
+            second = chr(65 + ((num_nodes - 26) % 26))
+            node_id = first + second
         
-        # Update algorithms with new graph
-        for algo in self.algorithms.values():
-            algo.graph = self.graph
-        
-        self.search_visualizer = SearchVisualizer(self.graph, self.algorithms)
+        # Add node to graph
+        self.graph.add_node(node_id, x=x, y=y)
         
         # Update node selection combos
         self.update_node_selection()
         
         # Visualize the graph
         self.visualize_graph()
+        
+        # Show confirmation message
+        self.status_message(f"Added node {node_id} at ({x}, {y})")
+    
+    def remove_custom_node(self):
+        """Remove the selected node from the custom graph"""
+        if not self.custom_graph_radio.isChecked() or self.remove_node_combo.count() == 0:
+            return
+        
+        # Get the selected node
+        node_idx = self.remove_node_combo.currentIndex()
+        node_id = self.remove_node_combo.itemData(node_idx)
+        
+        if node_id is None:
+            return
+        
+        # Remove the node and all its edges
+        if node_id in self.graph.nodes:
+            # Remove edges first
+            edges_to_remove = []
+            for neighbor in self.graph.get_neighbors(node_id):
+                edges_to_remove.append((node_id, neighbor))
+                edges_to_remove.append((neighbor, node_id))
+            
+            # Remove from edges dictionary
+            for n1, n2 in edges_to_remove:
+                if n1 in self.graph.edges and n2 in self.graph.edges[n1]:
+                    del self.graph.edges[n1][n2]
+            
+            # Remove from nodes dictionary
+            del self.graph.nodes[node_id]
+            
+            # Remove from NetworkX graph
+            self.graph.nx_graph.remove_node(node_id)
+            
+            # Update node selection combos
+            self.update_node_selection()
+            
+            # Visualize the graph
+            self.visualize_graph()
+            
+            # Show confirmation message
+            self.status_message(f"Removed node {node_id}")
     
     def update_node_selection(self):
         """Update the node selection combo boxes"""
@@ -656,15 +768,17 @@ class MainWindow(QMainWindow):
         self.goal_node_combo.clear()
         self.from_node_combo.clear()
         self.to_node_combo.clear()
+        self.remove_node_combo.clear()
         
         # Add nodes to combos with alphabetical labels
-        for node in nodes:
+        for node in sorted(nodes):
             label = self.graph.nodes[node].get('label', node)
-            display_text = f"{label} ({node})"
+            display_text = f"{node}"
             self.start_node_combo.addItem(display_text, node)
             self.goal_node_combo.addItem(display_text, node)
             self.from_node_combo.addItem(display_text, node)
             self.to_node_combo.addItem(display_text, node)
+            self.remove_node_combo.addItem(display_text, node)
         
         # Set default selections (first and last nodes)
         self.start_node_combo.setCurrentIndex(0)
@@ -738,6 +852,24 @@ class MainWindow(QMainWindow):
         # Confirmation message
         self.status_message(message)
     
+    def randomize_edge_costs(self):
+        """Randomize all edge costs in the graph"""
+        if not self.graph:
+            self.status_message("No graph exists to randomize costs", QMessageBox.Icon.Warning)
+            return
+            
+        # Randomize costs between 0.1 and 10.0
+        self.graph.randomize_edge_costs(0.1, 10.0)
+        
+        # Re-visualize the graph
+        self.visualize_graph()
+        
+        # Update the current edge cost display if an edge is selected
+        self.get_edge_cost()
+        
+        # Show confirmation message
+        self.status_message("All edge costs have been randomized")
+    
     def visualize_graph(self):
         """Visualize the current graph"""
         # Clear the figure
@@ -746,8 +878,12 @@ class MainWindow(QMainWindow):
         # Set figure background color based on theme
         if self.dark_mode_enabled:
             self.graph_figure.set_facecolor('#2D2D2D')
+            grid_color = '#555555'
+            text_color = 'white'
         else:
             self.graph_figure.set_facecolor('white')
+            grid_color = '#CCCCCC'
+            text_color = 'black'
         
         # Create a graph visualizer and plot
         visualizer = GraphVisualizer(self.graph)
@@ -767,8 +903,31 @@ class MainWindow(QMainWindow):
         else:
             visualizer.default_node_color = 'lightblue'
             visualizer.default_edge_color = 'gray'
-            
+        
+        # Plot the graph
         visualizer.plot_graph()
+        
+        # Add grid and markers
+        self.graph_ax.grid(True, linestyle='--', alpha=0.6, color=grid_color)
+        
+        # Set axis limits with some padding
+        self.graph_ax.set_xlim(-5, 105)
+        self.graph_ax.set_ylim(-5, 105)
+        
+        # Add markers every 10 units
+        x_ticks = range(0, 101, 10)
+        y_ticks = range(0, 101, 10)
+        self.graph_ax.set_xticks(x_ticks)
+        self.graph_ax.set_yticks(y_ticks)
+        
+        # Add labels
+        self.graph_ax.set_xlabel('X Position', color=text_color)
+        self.graph_ax.set_ylabel('Y Position', color=text_color)
+        
+        # Set tick colors and labels
+        self.graph_ax.tick_params(colors=text_color)
+        self.graph_ax.set_xticklabels(x_ticks)
+        self.graph_ax.set_yticklabels(y_ticks)
         
         # Refresh canvas
         self.graph_canvas.draw()
@@ -852,12 +1011,6 @@ class MainWindow(QMainWindow):
         table_text = self.search_visualizer.compare_results()
         self.results_table.setText(table_text)
     
-    def create_default_graph(self):
-        """Create a default graph for demonstration"""
-        # Use a random graph by default
-        self.random_graph_radio.setChecked(True)
-        self.generate_graph()
-    
     def status_message(self, message, icon=QMessageBox.Icon.Information):
         """Show a status message"""
         msg_box = QMessageBox()
@@ -899,6 +1052,60 @@ class MainWindow(QMainWindow):
             """)
         
         msg_box.exec()
+    
+    def clear_custom_graph(self):
+        """Clear the custom graph and start fresh"""
+        if not self.custom_graph_radio.isChecked():
+            return
+            
+        # Create a new empty graph
+        self.graph = MapGraph()
+        
+        # Update algorithms with new graph
+        for algo in self.algorithms.values():
+            algo.graph = self.graph
+        
+        self.search_visualizer = SearchVisualizer(self.graph, self.algorithms)
+        
+        # Update node selection combos
+        self.update_node_selection()
+        
+        # Visualize the graph
+        self.visualize_graph()
+        
+        # Show confirmation message
+        self.status_message("Cleared custom graph")
+    
+    def generate_graph(self):
+        """Generate a graph based on the selected options"""
+        # Clear existing graph
+        self.graph = MapGraph()
+        
+        # Generate based on selection
+        if self.random_graph_radio.isChecked():
+            num_nodes = self.node_count_spin.value()
+            connectivity = self.connectivity_spin.value() / 100.0
+            self.graph.generate_random_graph(num_nodes, connectivity)
+            self.status_message(f"Generated random graph with {num_nodes} nodes and {connectivity:.2f} connectivity")
+        
+        elif self.grid_graph_radio.isChecked():
+            width = self.grid_width_spin.value()
+            height = self.grid_height_spin.value()
+            diagonals = self.diagonal_edges_check.isChecked()
+            self.graph.generate_grid_graph(width, height, diagonals)
+            self.status_message(f"Generated grid graph of size {width}x{height}" + (" with diagonal edges" if diagonals else ""))
+        
+        # Update algorithms with new graph
+        for algo in self.algorithms.values():
+            algo.graph = self.graph
+        
+        self.search_visualizer = SearchVisualizer(self.graph, self.algorithms)
+        
+        # Update node selection combos
+        self.update_node_selection()
+        
+        # Visualize the graph
+        self.visualize_graph()
 
 
 # Main application

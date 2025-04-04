@@ -435,7 +435,7 @@ class SearchVisualizer:
         if not self.results:
             return "No results to compare"
         
-        headers = ["Algorithm", "Path Length", "Visited Nodes", "Execution Time (s)", "Max Memory"]
+        headers = ["Algorithm", "Path Length", "Visited Nodes", "Execution Time (ms)", "Max Memory"]
         data = []
         
         for name, result in self.results.items():
@@ -444,7 +444,7 @@ class SearchVisualizer:
                 name,
                 stats['path_length'],
                 stats['visited_nodes'],
-                f"{stats['execution_time']:.6f}",
+                f"{(stats['execution_time'] * 1000):.3f}",  # Convert to milliseconds
                 stats['max_memory']
             ])
         
@@ -474,7 +474,7 @@ class SearchVisualizer:
         algorithm_names = list(self.results.keys())
         path_lengths = [self.results[name]['stats']['path_length'] for name in algorithm_names]
         visited_nodes = [self.results[name]['stats']['visited_nodes'] for name in algorithm_names]
-        execution_times = [self.results[name]['stats']['execution_time'] for name in algorithm_names]
+        execution_times = [self.results[name]['stats']['execution_time'] * 1000 for name in algorithm_names]  # Convert to milliseconds
         memory_usage = [self.results[name]['stats']['max_memory'] for name in algorithm_names]
         
         if fig is None or axs is None:
@@ -483,14 +483,14 @@ class SearchVisualizer:
             for ax in axs.flat:
                 ax.clear()
                 
-        fig.suptitle('Algorithm Performance Comparison', fontsize=16)
+        fig.suptitle('Algorithm Performance Comparison', fontsize=16, y=0.95)
         
         # Set text color based on theme
         text_color = 'black' if not self.dark_mode else 'white'
         
         # Path length
         axs[0, 0].bar(algorithm_names, path_lengths, color=self.colors[:len(algorithm_names)])
-        axs[0, 0].set_title('Path Length', color=text_color)
+        axs[0, 0].set_title('Path Length', color=text_color, pad=20)
         axs[0, 0].set_ylabel('Number of Nodes', color=text_color)
         axs[0, 0].tick_params(colors=text_color)
         for spine in axs[0, 0].spines.values():
@@ -499,7 +499,7 @@ class SearchVisualizer:
         
         # Visited nodes
         axs[0, 1].bar(algorithm_names, visited_nodes, color=self.colors[:len(algorithm_names)])
-        axs[0, 1].set_title('Nodes Visited', color=text_color)
+        axs[0, 1].set_title('Nodes Visited', color=text_color, pad=20)
         axs[0, 1].set_ylabel('Number of Nodes', color=text_color)
         axs[0, 1].tick_params(colors=text_color)
         for spine in axs[0, 1].spines.values():
@@ -508,8 +508,8 @@ class SearchVisualizer:
         
         # Execution time
         axs[1, 0].bar(algorithm_names, execution_times, color=self.colors[:len(algorithm_names)])
-        axs[1, 0].set_title('Execution Time', color=text_color)
-        axs[1, 0].set_ylabel('Seconds', color=text_color)
+        axs[1, 0].set_title('Execution Time', color=text_color, pad=20)
+        axs[1, 0].set_ylabel('Milliseconds', color=text_color)  # Updated to milliseconds
         axs[1, 0].tick_params(colors=text_color)
         for spine in axs[1, 0].spines.values():
             spine.set_edgecolor(text_color)
@@ -517,12 +517,13 @@ class SearchVisualizer:
         
         # Memory usage
         axs[1, 1].bar(algorithm_names, memory_usage, color=self.colors[:len(algorithm_names)])
-        axs[1, 1].set_title('Memory Usage (Max Queue/Stack Size)', color=text_color)
+        axs[1, 1].set_title('Memory Usage (Max Queue/Stack Size)', color=text_color, pad=20)
         axs[1, 1].set_ylabel('Size', color=text_color)
         axs[1, 1].tick_params(colors=text_color)
         for spine in axs[1, 1].spines.values():
             spine.set_edgecolor(text_color)
         plt.setp(axs[1, 1].get_xticklabels(), rotation=45, ha='right', color=text_color)
         
-        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        # Adjust layout to prevent overlapping
+        plt.tight_layout(rect=[0, 0.03, 1, 0.92])
         return fig, axs 

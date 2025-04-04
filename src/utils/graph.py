@@ -195,3 +195,17 @@ class MapGraph(Graph):
                     self.add_edge(nodes[i], nodes[j], bidirectional=bidirectional)
         
         return self 
+
+    def randomize_edge_costs(self, min_cost=0.1, max_cost=10.0):
+        """Randomize the costs of all edges in the graph"""
+        for node1 in self.edges:
+            for node2 in self.edges[node1]:
+                # Generate a random cost between min_cost and max_cost
+                new_cost = np.random.uniform(min_cost, max_cost)
+                # Update the cost in both directions (for undirected graph)
+                self.edges[node1][node2] = new_cost
+                self.edges[node2][node1] = new_cost
+                # Update the NetworkX graph weights
+                self.nx_graph[node1][node2]['weight'] = new_cost
+                self.nx_graph[node2][node1]['weight'] = new_cost
+        return self 
