@@ -107,8 +107,8 @@ class MainWindow(QMainWindow):
         # Set up the UI
         self.setup_ui()
         
-        # Initialize empty graph visualization
-        self.visualize_graph()
+        # Create a default graph for demonstration
+        self.create_default_graph()
     
     def create_toolbar(self):
         """Create toolbar with actions like theme toggle"""
@@ -412,14 +412,14 @@ class MainWindow(QMainWindow):
         custom_graph_options = QGroupBox("Custom Graph Options")
         custom_layout = QGridLayout()
         
-        custom_layout.addWidget(QLabel("Node Position X:"), 0, 0)
+        custom_layout.addWidget(QLabel("Node X:"), 0, 0)
         self.node_x_spin = QDoubleSpinBox()
         self.node_x_spin.setRange(0, 100)
         self.node_x_spin.setValue(0)
         self.node_x_spin.setSingleStep(1.0)
         custom_layout.addWidget(self.node_x_spin, 0, 1)
         
-        custom_layout.addWidget(QLabel("Node Position Y:"), 1, 0)
+        custom_layout.addWidget(QLabel("Node Y:"), 1, 0)
         self.node_y_spin = QDoubleSpinBox()
         self.node_y_spin.setRange(0, 100)
         self.node_y_spin.setValue(0)
@@ -878,12 +878,8 @@ class MainWindow(QMainWindow):
         # Set figure background color based on theme
         if self.dark_mode_enabled:
             self.graph_figure.set_facecolor('#2D2D2D')
-            grid_color = '#555555'
-            text_color = 'white'
         else:
             self.graph_figure.set_facecolor('white')
-            grid_color = '#CCCCCC'
-            text_color = 'black'
         
         # Create a graph visualizer and plot
         visualizer = GraphVisualizer(self.graph)
@@ -903,31 +899,8 @@ class MainWindow(QMainWindow):
         else:
             visualizer.default_node_color = 'lightblue'
             visualizer.default_edge_color = 'gray'
-        
-        # Plot the graph
+            
         visualizer.plot_graph()
-        
-        # Add grid and markers
-        self.graph_ax.grid(True, linestyle='--', alpha=0.6, color=grid_color)
-        
-        # Set axis limits with some padding
-        self.graph_ax.set_xlim(-5, 105)
-        self.graph_ax.set_ylim(-5, 105)
-        
-        # Add markers every 10 units
-        x_ticks = range(0, 101, 10)
-        y_ticks = range(0, 101, 10)
-        self.graph_ax.set_xticks(x_ticks)
-        self.graph_ax.set_yticks(y_ticks)
-        
-        # Add labels
-        self.graph_ax.set_xlabel('X Position', color=text_color)
-        self.graph_ax.set_ylabel('Y Position', color=text_color)
-        
-        # Set tick colors and labels
-        self.graph_ax.tick_params(colors=text_color)
-        self.graph_ax.set_xticklabels(x_ticks)
-        self.graph_ax.set_yticklabels(y_ticks)
         
         # Refresh canvas
         self.graph_canvas.draw()
@@ -1010,6 +983,26 @@ class MainWindow(QMainWindow):
         # Results table
         table_text = self.search_visualizer.compare_results()
         self.results_table.setText(table_text)
+    
+    def create_default_graph(self):
+        """Set up the initial state without generating a graph"""
+        # Just set random graph as the default selection
+        self.random_graph_radio.setChecked(True)
+        
+        # Initialize an empty graph
+        self.graph = MapGraph()
+        
+        # Update algorithms with empty graph
+        for algo in self.algorithms.values():
+            algo.graph = self.graph
+        
+        self.search_visualizer = SearchVisualizer(self.graph, self.algorithms)
+        
+        # Update node selection combos (will be empty)
+        self.update_node_selection()
+        
+        # Visualize the empty graph
+        self.visualize_graph()
     
     def status_message(self, message, icon=QMessageBox.Icon.Information):
         """Show a status message"""
