@@ -160,6 +160,7 @@ class AStar(SearchAlgorithm):
         
         if start == goal:
             self.path = [start]
+            self.visited_nodes = 1  # Path length (1) + 0
             self.execution_time = time.time() - start_time
             return self.path
         
@@ -176,16 +177,16 @@ class AStar(SearchAlgorithm):
         # Keep track of visited nodes and paths
         came_from = {}
         closed_set = set()
-        self.visited_nodes = 0
+        self.visited_nodes = 0  # Will be set to path length + 1 when path is found
         max_queue_size = 1
         
         while open_set:
             max_queue_size = max(max_queue_size, len(open_set))
             _, _, current = heapq.heappop(open_set)
-            self.visited_nodes += 1
             
             if current == goal:
                 self.path = self.get_path(start, goal, came_from)
+                self.visited_nodes = len(self.path)  # Path length + 1 (since len(path) already includes both start and goal)
                 self.execution_time = time.time() - start_time
                 self.max_memory = max_queue_size
                 return self.path
@@ -210,6 +211,7 @@ class AStar(SearchAlgorithm):
                     heapq.heappush(open_set, (f_score[neighbor], g_score[neighbor], neighbor))
         
         self.path = []
+        self.visited_nodes = 0  # No path found
         self.execution_time = time.time() - start_time
         self.max_memory = max_queue_size
         return self.path 

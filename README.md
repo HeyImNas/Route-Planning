@@ -37,10 +37,13 @@ This project implements and compares different search algorithms (BFS, DFS, Gree
 
 ## Usage
 
-Run the application:
+1. Run the application:
 ```
 python main.py
 ```
+2. Create a graph with your parameters
+3. Run the algorithm
+
 
 ### Graph Creation
 
